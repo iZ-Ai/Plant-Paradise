@@ -1,0 +1,694 @@
+import React, { useState, useEffect } from "react";
+import { Leaf, Sprout, Trees, Flower, Plus, Star, Sparkles, Package, Crown, Zap } from "lucide-react";
+
+const PlantIdleGame = () => {
+  const [nectar, setNectar] = useState(50);
+  const [sunlight, setSunlight] = useState(0);
+  const [plantCollection, setPlantCollection] = useState({});
+  const [activeSlots, setActiveSlots] = useState({});
+  const [openingPack, setOpeningPack] = useState(null);
+  const [lastReward, setLastReward] = useState(null);
+  const [activeTab, setActiveTab] = useState('farm');
+  const [lastMilestoneReached, setLastMilestoneReached] = useState(0);
+  const [generators, setGenerators] = useState({
+    sprinkler: { level: 0, cost: 100, baseNectar: 2 },
+    greenhouse: { level: 0, cost: 500, baseNectar: 8 },
+    beehive: { level: 0, cost: 2000, baseNectar: 25 },
+    mysticwell: { level: 0, cost: 10000, baseNectar: 75 }
+  });
+
+  const plantTypes = {
+    daisy: { name: 'Daisy', icon: Flower, rarity: 'common', color: 'text-white', bgColor: 'bg-gray-400', growthTime: 10000, harvestReward: 15 },
+    grass: { name: 'Grass', icon: Sprout, rarity: 'common', color: 'text-white', bgColor: 'bg-gray-500', growthTime: 8000, harvestReward: 12 },
+    clover: { name: 'Clover', icon: Leaf, rarity: 'common', color: 'text-white', bgColor: 'bg-gray-600', growthTime: 12000, harvestReward: 20 },
+    sunflower: { name: 'Sunflower', icon: Star, rarity: 'uncommon', color: 'text-white', bgColor: 'bg-green-500', growthTime: 20000, harvestReward: 50 },
+    rose: { name: 'Rose', icon: Flower, rarity: 'uncommon', color: 'text-white', bgColor: 'bg-green-600', growthTime: 25000, harvestReward: 65 },
+    oak: { name: 'Oak Tree', icon: Trees, rarity: 'rare', color: 'text-white', bgColor: 'bg-blue-500', growthTime: 45000, harvestReward: 180 },
+    lotus: { name: 'Lotus', icon: Flower, rarity: 'rare', color: 'text-white', bgColor: 'bg-blue-600', growthTime: 50000, harvestReward: 220 },
+    phoenix: { name: 'Phoenix Flower', icon: Zap, rarity: 'legendary', color: 'text-white', bgColor: 'bg-purple-600', growthTime: 90000, harvestReward: 500 },
+    celestial: { name: 'Celestial Bloom', icon: Sparkles, rarity: 'mythical', color: 'text-white', bgColor: 'bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600', growthTime: 180000, harvestReward: 1500 }
+  };
+
+  const seedPacks = {
+    basic: { name: 'Basic Seed Pack', cost: 10, icon: Package, color: 'text-gray-600', rarityRates: { common: 85, uncommon: 15, rare: 0, legendary: 0, mythical: 0 } },
+    premium: { name: 'Premium Seed Pack', cost: 50, icon: Package, color: 'text-green-600', rarityRates: { common: 60, uncommon: 25, rare: 10, legendary: 4, mythical: 1 } },
+    legendary: { name: 'Legendary Seed Pack', cost: 200, icon: Crown, color: 'text-purple-600', rarityRates: { common: 0, uncommon: 25, rare: 50, legendary: 20, mythical: 5 } }
+  };
+
+  const generatorTypes = {
+    sprinkler: { 
+      name: 'Garden Sprinkler', 
+      icon: Sparkles, 
+      description: 'Automatically waters plants for extra nectar',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100'
+    },
+    greenhouse: { 
+      name: 'Mini Greenhouse', 
+      icon: Trees, 
+      description: 'Controlled environment boosts nectar production',
+      color: 'text-green-600',
+      bgColor: 'bg-green-100'
+    },
+    beehive: { 
+      name: 'Magical Beehive', 
+      icon: Crown, 
+      description: 'Bees pollinate plants for premium nectar',
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-100'
+    },
+    mysticwell: { 
+      name: 'Mystic Well', 
+      icon: Star, 
+      description: 'Ancient magic continuously generates pure nectar',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-100'
+    }
+  };
+
+  const sunlightShop = {
+    golden_daisy: { name: 'Golden Daisy', icon: Star, rarity: 'legendary', color: 'text-white', bgColor: 'bg-gradient-to-r from-yellow-400 to-orange-500', growthTime: 15000, harvestReward: 150, sunlightCost: 5 },
+    rainbow_rose: { name: 'Rainbow Rose', icon: Flower, rarity: 'mythical', color: 'text-white', bgColor: 'bg-gradient-to-r from-red-400 via-green-400 to-blue-400', growthTime: 45000, harvestReward: 400, sunlightCost: 15 },
+    starfruit_tree: { name: 'Starfruit Tree', icon: Crown, rarity: 'mythical', color: 'text-white', bgColor: 'bg-gradient-to-r from-purple-500 to-pink-500', growthTime: 60000, harvestReward: 800, sunlightCost: 25 }
+  };
+
+  const milestones = [
+    { plants: 5, sunlight: 1, description: "First Garden" },
+    { plants: 10, sunlight: 2, description: "Growing Collection" },
+    { plants: 25, sunlight: 5, description: "Plant Enthusiast" },
+    { plants: 50, sunlight: 10, description: "Master Gardener" }
+  ];
+
+  const checkMilestones = (totalPlants) => {
+    const unlockedMilestones = milestones.filter(m => totalPlants >= m.plants);
+    const highestUnlocked = unlockedMilestones[unlockedMilestones.length - 1];
+    
+    if (highestUnlocked && highestUnlocked.plants > lastMilestoneReached) {
+      const newSunlight = unlockedMilestones
+        .filter(m => m.plants > lastMilestoneReached)
+        .reduce((sum, m) => sum + m.sunlight, 0);
+      
+      setSunlight(prev => prev + newSunlight);
+      setLastMilestoneReached(highestUnlocked.plants);
+      setLastReward(`milestone_${highestUnlocked.plants}`);
+      setTimeout(() => setLastReward(null), 3000);
+    }
+  };
+
+  const getTotalNectarPerSecond = () => {
+    let total = 0;
+    
+    // Nectar from active plant slots
+    Object.keys(activeSlots).forEach(slotId => {
+      const slot = activeSlots[slotId];
+      if (slot && (plantTypes[slot.type] || sunlightShop[slot.type])) {
+        const plant = plantTypes[slot.type] || sunlightShop[slot.type];
+        total += Math.floor(plant.harvestReward * 0.1 / 60);
+      }
+    });
+    
+    // Nectar from generators
+    Object.entries(generators).forEach(([genType, gen]) => {
+      if (gen.level > 0) {
+        const baseNectar = gen.baseNectar;
+        const nectarPerSec = baseNectar * gen.level;
+        total += nectarPerSec;
+      }
+    });
+    
+    return total;
+  };
+
+  const getGrowthProgress = (slot) => {
+    if (!slot || !slot.plantedTime) return 0;
+    const now = Date.now();
+    const elapsed = now - slot.plantedTime;
+    const plant = plantTypes[slot.type] || sunlightShop[slot.type];
+    return Math.min((elapsed / plant.growthTime) * 100, 100);
+  };
+
+  const isReadyToHarvest = (slot) => slot && getGrowthProgress(slot) >= 100;
+
+  const formatTime = (ms) => {
+    const seconds = Math.ceil(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
+  const getRemainingTime = (slot) => {
+    if (!slot || !slot.plantedTime) return 0;
+    const now = Date.now();
+    const plant = plantTypes[slot.type] || sunlightShop[slot.type];
+    const elapsed = now - slot.plantedTime;
+    return Math.max(0, plant.growthTime - elapsed);
+  };
+
+  const getTotalPlantsCollected = () => Object.values(plantCollection).reduce((sum, count) => sum + count, 0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const nectarGain = getTotalNectarPerSecond();
+      if (nectarGain > 0) {
+        setNectar(prev => prev + nectarGain);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [activeSlots, generators]);
+
+  const rollForPlant = (rarityRates) => {
+    const random = Math.random() * 100;
+    let cumulative = 0;
+    
+    for (const [rarity, rate] of Object.entries(rarityRates)) {
+      cumulative += rate;
+      if (random <= cumulative) {
+        const plantsOfRarity = Object.entries(plantTypes).filter(([_, plant]) => plant.rarity === rarity);
+        if (plantsOfRarity.length > 0) {
+          const randomPlant = plantsOfRarity[Math.floor(Math.random() * plantsOfRarity.length)];
+          return randomPlant[0];
+        }
+      }
+    }
+    
+    const commonPlants = Object.entries(plantTypes).filter(([_, plant]) => plant.rarity === 'common');
+    return commonPlants[0][0];
+  };
+
+  const openSeedPack = (packType) => {
+    const pack = seedPacks[packType];
+    if (nectar < pack.cost) return;
+
+    setNectar(prev => prev - pack.cost);
+    setOpeningPack(packType);
+
+    setTimeout(() => {
+      const newPlant = rollForPlant(pack.rarityRates);
+      const emptySlots = Array.from({length: 12}, (_, i) => i + 1).filter(id => !activeSlots[id]);
+      
+      if (emptySlots.length > 0) {
+        const slotId = emptySlots[Math.floor(Math.random() * emptySlots.length)];
+        setActiveSlots(prev => ({
+          ...prev,
+          [slotId]: { type: newPlant, plantedTime: Date.now() }
+        }));
+      }
+
+      setPlantCollection(prev => {
+        const newCollection = { ...prev, [newPlant]: (prev[newPlant] || 0) + 1 };
+        const totalPlants = Object.values(newCollection).reduce((sum, count) => sum + count, 0);
+        setTimeout(() => checkMilestones(totalPlants), 100);
+        return newCollection;
+      });
+
+      setLastReward(newPlant);
+      setOpeningPack(null);
+      setTimeout(() => setLastReward(null), 3000);
+    }, 1500);
+  };
+
+  const buySunlightPlant = (plantKey) => {
+    const plant = sunlightShop[plantKey];
+    if (sunlight < plant.sunlightCost) return;
+
+    const emptySlots = Array.from({length: 12}, (_, i) => i + 1).filter(id => !activeSlots[id]);
+    if (emptySlots.length === 0) return;
+
+    setSunlight(prev => prev - plant.sunlightCost);
+    
+    const slotId = emptySlots[Math.floor(Math.random() * emptySlots.length)];
+    setActiveSlots(prev => ({
+      ...prev,
+      [slotId]: { type: plantKey, plantedTime: Date.now() }
+    }));
+
+    setPlantCollection(prev => {
+      const newCollection = { ...prev, [plantKey]: (prev[plantKey] || 0) + 1 };
+      const totalPlants = Object.values(newCollection).reduce((sum, count) => sum + count, 0);
+      setTimeout(() => checkMilestones(totalPlants), 100);
+      return newCollection;
+    });
+
+    setLastReward(plantKey);
+    setTimeout(() => setLastReward(null), 3000);
+  };
+
+  const buyGenerator = (genType) => {
+    const gen = generators[genType];
+    const currentCost = Math.floor(gen.cost * Math.pow(1.15, gen.level));
+    
+    if (nectar < currentCost) return;
+    
+    setNectar(prev => prev - currentCost);
+    setGenerators(prev => ({
+      ...prev,
+      [genType]: {
+        ...prev[genType],
+        level: prev[genType].level + 1
+      }
+    }));
+  };
+
+  const harvestPlant = (slotId) => {
+    const slot = activeSlots[slotId];
+    if (!slot || !isReadyToHarvest(slot)) return;
+
+    const plant = plantTypes[slot.type] || sunlightShop[slot.type];
+    setNectar(prev => prev + plant.harvestReward);
+
+    setActiveSlots(prev => {
+      const newSlots = { ...prev };
+      delete newSlots[slotId];
+      return newSlots;
+    });
+
+    setLastReward(`harvested_${slot.type}`);
+    setTimeout(() => setLastReward(null), 2000);
+  };
+
+  const PlantSlot = ({ slotId }) => {
+    const slot = activeSlots[slotId];
+
+    if (!slot) {
+      return (
+        <div className="w-20 h-20 bg-amber-100 border-2 border-dashed border-amber-300 rounded-lg flex items-center justify-center">
+          <Plus className="w-6 h-6 text-amber-400" />
+        </div>
+      );
+    }
+
+    const plant = plantTypes[slot.type] || sunlightShop[slot.type];
+    const IconComponent = plant.icon;
+    const progress = getGrowthProgress(slot);
+    const ready = isReadyToHarvest(slot);
+    const remainingTime = getRemainingTime(slot);
+
+    return (
+      <div 
+        className={`w-20 h-20 ${plant.bgColor} rounded-lg flex flex-col items-center justify-center transition-all relative overflow-hidden ${ready ? 'animate-pulse ring-2 ring-yellow-400' : ''}`}
+        title={ready ? `${plant.name} - Ready to harvest!` : `${plant.name} - Growing... ${formatTime(remainingTime)} remaining`}
+      >
+        <IconComponent className={`w-6 h-6 ${plant.color} ${ready ? 'animate-bounce' : ''}`} />
+        
+        {!ready && (
+          <>
+            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-20 h-2">
+              <div 
+                className="h-full bg-green-400 transition-all duration-1000" 
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="text-xs text-white font-bold mt-1">
+              {formatTime(remainingTime)}
+            </div>
+          </>
+        )}
+        
+        {ready && (
+          <div className="text-xs font-bold text-yellow-200 animate-pulse">
+            READY!
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const getRarityColor = (rarity) => {
+    switch (rarity) {
+      case 'common': return 'text-gray-600';
+      case 'uncommon': return 'text-green-600';
+      case 'rare': return 'text-blue-600';
+      case 'legendary': return 'text-purple-600';
+      case 'mythical': return 'text-yellow-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const readyPlantsCount = Object.values(activeSlots).filter(slot => isReadyToHarvest(slot)).length;
+  const totalPlantsCollected = getTotalPlantsCollected();
+  const nextMilestone = milestones.find(m => totalPlantsCollected < m.plants);
+
+  return (
+    <div className="max-w-6xl mx-auto p-6 bg-gradient-to-b from-green-50 to-blue-50 min-h-screen">
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-green-800 mb-2">Plant Paradise</h1>
+        <p className="text-green-600">Collect magical plants from seed packs!</p>
+        
+        <div className="flex justify-center items-center gap-4 mt-4">
+          <div className="bg-white rounded-lg px-4 py-2 shadow-md">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-blue-500" />
+              <span className="font-bold text-lg">{Math.floor(nectar)} Nectar</span>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg px-4 py-2 shadow-md">
+            <div className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-yellow-500" />
+              <span className="font-bold text-lg">{sunlight} Sunlight</span>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg px-4 py-2 shadow-md">
+            <span className="font-bold text-lg text-green-600">+{getTotalNectarPerSecond()}/sec</span>
+          </div>
+        </div>
+
+        {nextMilestone && (
+          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div className="text-sm text-yellow-700">
+              Next Milestone: <span className="font-bold">{nextMilestone.description}</span>
+            </div>
+            <div className="text-xs text-yellow-600">
+              {totalPlantsCollected}/{nextMilestone.plants} plants (+{nextMilestone.sunlight} sunlight)
+            </div>
+            <div className="w-full bg-yellow-200 rounded-full h-2 mt-2">
+              <div 
+                className="bg-yellow-500 h-2 rounded-full transition-all duration-300" 
+                style={{ width: `${Math.min((totalPlantsCollected / nextMilestone.plants) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {lastReward && (
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-bounce">
+          <div className={`${
+            lastReward.startsWith('milestone_') ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
+            lastReward.startsWith('harvested_') ? 'bg-yellow-500' : 
+            (plantTypes[lastReward] || sunlightShop[lastReward]).bgColor
+          } rounded-xl p-6 shadow-2xl border-4 border-yellow-400`}>
+            <div className="text-center text-white">
+              {lastReward.startsWith('milestone_') ? (
+                <>
+                  <div className="text-2xl font-bold mb-2">MILESTONE!</div>
+                  <Star className="w-16 h-16 mx-auto mb-2" />
+                  <div className="text-xl font-bold">Sunlight Earned!</div>
+                </>
+              ) : lastReward.startsWith('harvested_') ? (
+                <>
+                  <div className="text-2xl font-bold mb-2">HARVESTED!</div>
+                  {React.createElement((plantTypes[lastReward.replace('harvested_', '')] || sunlightShop[lastReward.replace('harvested_', '')]).icon, { className: "w-16 h-16 mx-auto mb-2" })}
+                  <div className="text-xl font-bold">+{(plantTypes[lastReward.replace('harvested_', '')] || sunlightShop[lastReward.replace('harvested_', '')]).harvestReward} Nectar</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold mb-2">NEW PLANT!</div>
+                  {React.createElement((plantTypes[lastReward] || sunlightShop[lastReward]).icon, { className: "w-16 h-16 mx-auto mb-2" })}
+                  <div className="text-xl font-bold">{(plantTypes[lastReward] || sunlightShop[lastReward]).name}</div>
+                  <div className="text-sm opacity-90">{(plantTypes[lastReward] || sunlightShop[lastReward]).rarity.toUpperCase()}</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl shadow-lg mb-8">
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('farm')}
+            className={`flex-1 py-4 px-6 text-lg font-semibold transition-colors ${activeTab === 'farm' ? 'bg-yellow-100 text-yellow-800 border-b-2 border-yellow-500' : 'text-gray-600 hover:text-yellow-600'}`}
+          >
+            Farm ({readyPlantsCount} ready)
+          </button>
+          <button
+            onClick={() => setActiveTab('generators')}
+            className={`flex-1 py-4 px-6 text-lg font-semibold transition-colors ${activeTab === 'generators' ? 'bg-purple-100 text-purple-800 border-b-2 border-purple-500' : 'text-gray-600 hover:text-purple-600'}`}
+          >
+            Generators (+{Object.values(generators).reduce((sum, gen) => sum + (gen.baseNectar * gen.level), 0)}/sec)
+          </button>
+          <button
+            onClick={() => setActiveTab('collection')}
+            className={`flex-1 py-4 px-6 text-lg font-semibold transition-colors ${activeTab === 'collection' ? 'bg-blue-100 text-blue-800 border-b-2 border-blue-500' : 'text-gray-600 hover:text-blue-600'}`}
+          >
+            Collection ({totalPlantsCollected})
+          </button>
+          <button
+            onClick={() => setActiveTab('shop')}
+            className={`flex-1 py-4 px-6 text-lg font-semibold transition-colors ${activeTab === 'shop' ? 'bg-green-100 text-green-800 border-b-2 border-green-500' : 'text-gray-600 hover:text-green-600'}`}
+          >
+            Shop
+          </button>
+        </div>
+
+        <div className="p-6">
+          {activeTab === 'farm' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div>
+                <h2 className="text-2xl font-bold text-green-800 mb-4">Garden Plots</h2>
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  {Array.from({length: 12}, (_, i) => i + 1).map(slotId => (
+                    <PlantSlot key={slotId} slotId={slotId} />
+                  ))}
+                </div>
+                <div className="text-sm text-gray-600 text-center">
+                  Plants grow over time. Ready plants appear in the harvest section!
+                </div>
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-bold text-yellow-800 mb-4">Ready to Harvest</h2>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {Object.entries(activeSlots)
+                    .filter(([_, slot]) => isReadyToHarvest(slot))
+                    .map(([slotId, slot]) => {
+                      const plant = plantTypes[slot.type] || sunlightShop[slot.type];
+                      const IconComponent = plant.icon;
+                      
+                      return (
+                        <div
+                          key={slotId}
+                          className="flex items-center gap-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200 hover:border-yellow-400 transition-all cursor-pointer"
+                          onClick={() => harvestPlant(slotId)}
+                        >
+                          <div className={`w-16 h-16 ${plant.bgColor} rounded-lg flex items-center justify-center animate-pulse`}>
+                            <IconComponent className={`w-8 h-8 ${plant.color}`} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-bold text-lg">{plant.name}</div>
+                            <div className="text-sm text-gray-600 capitalize">{plant.rarity}</div>
+                            <div className="text-lg font-bold text-yellow-600">+{plant.harvestReward} Nectar</div>
+                          </div>
+                          <div className="text-yellow-500 font-bold text-xl animate-bounce">
+                            READY!
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {readyPlantsCount === 0 && (
+                    <div className="text-center text-gray-500 py-8">
+                      No plants ready to harvest yet. Check back soon!
+                    </div>
+                  )}
+                </div>
+                
+                {readyPlantsCount > 0 && (
+                  <button
+                    onClick={() => {
+                      Object.entries(activeSlots).forEach(([slotId, slot]) => {
+                        if (isReadyToHarvest(slot)) {
+                          harvestPlant(slotId);
+                        }
+                      });
+                    }}
+                    className="w-full mt-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg transition-colors"
+                  >
+                    Harvest All ({readyPlantsCount})
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : activeTab === 'generators' ? (
+            <div>
+              <h2 className="text-2xl font-bold text-purple-800 mb-4">Nectar Generators</h2>
+              <p className="text-gray-600 mb-6">Build generators that automatically produce nectar over time!</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.entries(generatorTypes).map(([genKey, genData]) => {
+                  const gen = generators[genKey];
+                  const IconComponent = genData.icon;
+                  const currentCost = Math.floor(gen.cost * Math.pow(1.15, gen.level));
+                  const canAfford = nectar >= currentCost;
+                  const nectarPerSec = gen.baseNectar * gen.level;
+                  
+                  return (
+                    <div key={genKey} className={`${genData.bgColor} rounded-xl p-6 border-2 ${canAfford ? 'border-gray-300' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center shadow-md">
+                          <IconComponent className={`w-8 h-8 ${genData.color}`} />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-800">{genData.name}</h3>
+                          <p className="text-sm text-gray-600">{genData.description}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2 mb-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 font-medium">Level:</span>
+                          <span className="font-bold text-lg">{gen.level}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 font-medium">Production:</span>
+                          <span className="font-bold text-lg text-blue-600">+{nectarPerSec}/sec</span>
+                        </div>
+                        {gen.level > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-700 font-medium">Next level:</span>
+                            <span className="font-bold text-lg text-blue-600">+{gen.baseNectar}/sec</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={() => buyGenerator(genKey)}
+                        disabled={!canAfford}
+                        className={`w-full py-3 px-4 rounded-lg font-bold text-lg transition-all ${
+                          canAfford 
+                            ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer hover:shadow-md' 
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {gen.level === 0 ? 'Build' : 'Upgrade'} - {currentCost.toLocaleString()} Nectar
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="mt-8 bg-gradient-to-r from-purple-100 to-blue-100 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-3">Generator Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {Object.entries(generatorTypes).map(([genKey, genData]) => {
+                    const gen = generators[genKey];
+                    const nectarPerSec = gen.baseNectar * gen.level;
+                    
+                    if (gen.level === 0) return null;
+                    
+                    return (
+                      <div key={genKey} className="bg-white rounded-lg p-3 text-center">
+                        <div className="text-sm font-medium text-gray-600">{genData.name}</div>
+                        <div className="text-lg font-bold text-purple-600">Level {gen.level}</div>
+                        <div className="text-sm text-blue-600">+{nectarPerSec}/sec</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-4 text-center">
+                  <div className="text-lg font-bold text-gray-800">
+                    Total Generator Production: <span className="text-purple-600">+{Object.values(generators).reduce((sum, gen) => sum + (gen.baseNectar * gen.level), 0)}/sec</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'collection' ? (
+            <div>
+              <h2 className="text-2xl font-bold text-blue-800 mb-4">Plant Collection</h2>
+              {Object.keys(plantCollection).length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No plants collected yet. Open some seed packs!</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {Object.entries(plantCollection)
+                    .sort(([,a], [,b]) => b - a)
+                    .map(([type, count]) => {
+                      const plant = plantTypes[type] || sunlightShop[type];
+                      if (!plant) return null; // Skip if plant not found
+                      const IconComponent = plant.icon;
+                      return (
+                        <div key={type} className={`${plant.bgColor} rounded-lg p-4 text-center`}>
+                          <IconComponent className={`w-8 h-8 ${plant.color} mx-auto mb-2`} />
+                          <div className="font-semibold text-white text-sm">{plant.name}</div>
+                          <div className="text-lg font-bold text-white">×{count}</div>
+                          <div className="text-xs text-white opacity-75">{plant.rarity}</div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div>
+                <h2 className="text-2xl font-bold text-green-800 mb-4">Seed Packs</h2>
+                <div className="space-y-4">
+                  {Object.entries(seedPacks).map(([packType, pack]) => {
+                    const IconComponent = pack.icon;
+                    const canAfford = nectar >= pack.cost;
+                    
+                    return (
+                      <button
+                        key={packType}
+                        onClick={() => openSeedPack(packType)}
+                        disabled={!canAfford || openingPack}
+                        className={`w-full p-4 rounded-lg border-2 transition-all ${canAfford && !openingPack ? 'bg-white border-green-300 hover:border-green-500 hover:shadow-md cursor-pointer' : 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'}`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <IconComponent className={`w-12 h-12 ${pack.color}`} />
+                            {openingPack === packType && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="font-bold text-lg">{pack.name}</div>
+                            <div className="text-lg font-bold text-blue-600">{pack.cost} Nectar</div>
+                            <div className="text-xs text-gray-500 flex gap-2 mt-1">
+                              {Object.entries(pack.rarityRates).map(([rarity, rate]) => 
+                                rate > 0 && (
+                                  <span key={rarity} className={getRarityColor(rarity)}>
+                                    {rarity}: {rate}%
+                                  </span>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-bold text-yellow-600 mb-4">Sunlight Shop</h2>
+                <div className="space-y-3">
+                  {Object.entries(sunlightShop).map(([plantKey, plant]) => {
+                    const IconComponent = plant.icon;
+                    const canAfford = sunlight >= plant.sunlightCost;
+                    const emptySlots = Array.from({length: 12}, (_, i) => i + 1).filter(id => !activeSlots[id]);
+                    
+                    return (
+                      <button
+                        key={plantKey}
+                        onClick={() => buySunlightPlant(plantKey)}
+                        disabled={!canAfford || emptySlots.length === 0}
+                        className={`w-full p-3 rounded-lg border-2 transition-all ${canAfford && emptySlots.length > 0 ? 'bg-white border-yellow-300 hover:border-yellow-500 hover:shadow-md cursor-pointer' : 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-12 h-12 ${plant.bgColor} rounded-lg flex items-center justify-center`}>
+                            <IconComponent className={`w-6 h-6 ${plant.color}`} />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="font-bold text-md">{plant.name}</div>
+                            <div className="text-md font-bold text-yellow-600">{plant.sunlightCost} Sunlight</div>
+                            <div className="text-xs text-gray-500">+{plant.harvestReward} nectar</div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PlantIdleGame;
